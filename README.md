@@ -1,20 +1,15 @@
 # KOReader User Patches
 
-A small collection of [KOReader](https://github.com/koreader/koreader) user
-patches. One is original work; the two header patches are sourced from
-[joshuacant/KOReader.patches](https://github.com/joshuacant/KOReader.patches)
-with a single original bug‑fix added on top (see
-[The page‑browser fix](#the-pagebrowser-fix)).
+A [KOReader](https://github.com/koreader/koreader) user patch that turns the
+Skim dialog's bookmark buttons into **location‑history navigation**.
 
 | Patch | Origin |
 |---|---|
 | [`2-skim-location-history.lua`](#2-skim-location-historylua--skim-location-history) | **Original** |
-| [`2-reader-header-centered.lua`](#header-patches-centered--cornered) | Sourced from [joshuacant/KOReader.patches](https://github.com/joshuacant/KOReader.patches) (+ original page‑browser fix) |
-| [`2-reader-header-cornered.lua`](#header-patches-centered--cornered) | Sourced from [joshuacant/KOReader.patches](https://github.com/joshuacant/KOReader.patches) (+ original page‑browser fix) |
 
-> Tested on KOReader **v2026.03** (Kindle). They should work on nearby
-> versions, but see the per‑patch notes — the skim patch in particular is tied
-> to the version it was written against.
+> Tested on KOReader **v2026.03** (Kindle). It should work on nearby versions,
+> but the patch is tied to the version it was written against — see
+> [Note on versioning](#note-on-versioning).
 
 ---
 
@@ -29,7 +24,7 @@ The numeric prefix sets *when* a patch runs and the order patches run in
 (natural sort, so `2-…` before `10-…`):
 
 - `1-…` – early, before the UI is ready
-- `2-…` – late, after the UI is ready (what all of these use)
+- `2-…` – late, after the UI is ready (what this patch uses)
 - `8-…` / `9-…` – just before / at exit
 
 If a patch fails to load, KOReader shows an error popup at startup and you can
@@ -42,10 +37,8 @@ patch can never lock you out.
    `/mnt/us/koreader/`; on other platforms it's wherever KOReader is installed
    (e.g. `~/.config/koreader/` on desktop Linux).
 2. Create a `patches/` subfolder inside it if it doesn't already exist.
-3. Copy the `.lua` file(s) you want into `koreader/patches/`.
+3. Copy `2-skim-location-history.lua` into `koreader/patches/`.
 4. Restart KOReader.
-
-You can install any subset — the patches are independent of one another.
 
 ---
 
@@ -111,90 +104,19 @@ tell you at startup rather than failing silently.
 
 ---
 
-## Header patches (centered & cornered)
-
-**Sourced from [joshuacant/KOReader.patches](https://github.com/joshuacant/KOReader.patches).**
-These add a "header" to the top of the reading screen, mirroring the footer/status
-bar at the bottom. They draw **only for reflowable documents** (EPUB and similar)
-and never for fixed‑layout documents (PDF, CBZ).
-
-- **`2-reader-header-centered.lua`** — a single, centred header line at the top
-  of the screen. Ships configured to show the clock.
-- **`2-reader-header-cornered.lua`** — two items, one in the top‑left and one in
-  the top‑right corner (like the footer). Ships configured to show the book
-  title (left) and author (right).
-
-Both are configured *in code*: open the file and edit the clearly‑marked
-sections (formatting options near the top, and the block that decides what text
-is displayed). The available values — title, author, page progress, chapter
-info, percentage, clock, battery, etc. — are set up as local variables with
-comments; anything `ReaderFooter` can show, these can show too. See the comments
-at the top of each file for details.
-
-> **Tip:** the header draws *over* the page, so give your book enough top margin
-> that the text isn't obscured.
-
-### The page‑browser fix
-
-> **This is the only part of the two header patches that is original to this
-> repository.**
-
-The upstream header patches hook `ReaderView:paintTo`, the method KOReader calls
-to draw a page. The problem: KOReader also renders **Page Browser** and **Book
-Map** thumbnails by calling that same method — but off‑screen, inside a
-short‑lived subprocess. With the unmodified patches, the header‑drawing code
-runs during thumbnail generation too; for EPUBs it tries to draw the header into
-the off‑screen buffer, the subprocess produces no usable tile, and **thumbnails
-spin forever and never load**.
-
-The fix is a single guard added right after the existing `render_mode` check, so
-the header is drawn only when painting to the real screen framebuffer and is a
-no‑op during off‑screen thumbnail rendering:
-
-```lua
-if bb ~= Screen.bb then return end -- Only draw on the real screen; skip off-screen renders (page browser / book map thumbnails)
-```
-
-During normal reading, KOReader always paints widgets to `Screen.bb`; the
-thumbnail path paints to a freshly‑allocated buffer instead, so the two are
-cleanly distinguished. The header still appears while reading (and in
-screenshots, which snapshot the screen directly), and thumbnails render cleanly
-without the header baked into them.
-
-If you write your own `ReaderView:paintTo` overlay patch, include the same guard
-to avoid breaking thumbnailing.
-
----
-
 ## Credits & attribution
 
-- **`2-skim-location-history.lua`** — original work by
-  [**albertmichaelj**](https://github.com/albertmichaelj), created for this
-  repository (derived from KOReader's own `skimtowidget.lua`).
-- **`2-reader-header-centered.lua`** and **`2-reader-header-cornered.lua`** —
-  authored by **joshuacant** and taken from
-  [joshuacant/KOReader.patches](https://github.com/joshuacant/KOReader.patches).
-  The only original modification made here, by
-  [**albertmichaelj**](https://github.com/albertmichaelj), is the
-  [page‑browser fix](#the-pagebrowser-fix) described above. All other credit for
-  these two patches belongs to joshuacant.
-
-If you find these useful, please also check out the upstream repo — it contains
-many more patches than the two reproduced here.
+**`2-skim-location-history.lua`** — original work by
+[**albertmichaelj**](https://github.com/albertmichaelj), created for this
+repository (derived from KOReader's own `skimtowidget.lua`).
 
 ## License
 
-**AGPL‑3.0** — full text in [`LICENSE`](LICENSE). This matches both upstream
-sources:
+**AGPL‑3.0** — full text in [`LICENSE`](LICENSE). The patch is derived from
+KOReader's own source (`skimtowidget.lua`), which is also **AGPL‑3.0**.
 
-- The header patches are distributed by joshuacant under **AGPL‑3.0**.
-- The skim patch is derived from KOReader's own source
-  (`skimtowidget.lua`), which is also **AGPL‑3.0**.
-
-Copyright © 2026 [albertmichaelj](https://github.com/albertmichaelj) for the
-original contributions in this repository (the skim patch and the page‑browser
-fix). The header patches remain copyright their original author, joshuacant.
+Copyright © 2026 [albertmichaelj](https://github.com/albertmichaelj).
 
 As a copyleft license, AGPL‑3.0 requires that redistributed and modified
-versions remain under AGPL‑3.0. Please keep the attribution comments at the top
-of each file intact.
+versions remain under AGPL‑3.0. Please keep the attribution comment at the top
+of the file intact.
