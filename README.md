@@ -1,17 +1,18 @@
 # KOReader User Patches
 
-Two [KOReader](https://github.com/koreader/koreader) user patches: one that turns
-the Skim dialog's bookmark buttons into **location‑history navigation**, and one
-that **fixes wrong EPUB page numbers** caused by a crengine page‑map bug.
+A small collection of [KOReader](https://github.com/koreader/koreader) user
+patches — one navigation tweak and two fixes for how page numbers behave in
+EPUBs that carry publisher/reference page numbers.
 
 | Patch | What it does | Origin |
 |---|---|---|
 | [`2-skim-location-history.lua`](#2-skim-location-historylua--skim-location-history) | Location‑history navigation in the Skim dialog | **Original** |
 | [`2-fix-pagemap-order.lua`](#2-fix-pagemap-orderlua--page-map-order-fix) | Corrects EPUB page numbers when the page‑list is out of reading order | **Original** (stop‑gap for [crengine#688](https://github.com/koreader/crengine/issues/688)) |
+| [`2-chapter-pages-left-screens.lua`](#2-chapter-pages-left-screenslua--pages-left-in-chapter-as-screens) | Counts "pages left in chapter" as screen turns, not reference pages | **Original** |
 
-> Tested on KOReader **v2026.03** (Kindle). Both patches monkey‑patch KOReader
+> Tested on KOReader **v2026.03** (Kindle). All of these monkey‑patch KOReader
 > internals, so re‑verify them after a KOReader update. They are independent —
-> install either or both.
+> install any subset.
 
 ---
 
@@ -164,9 +165,53 @@ monkey‑patches internals, re‑verify it after KOReader updates.
 
 ---
 
+## `2-chapter-pages-left-screens.lua` — "Pages left in chapter" as screens
+
+**Original work.** Makes the footer's **"pages left in chapter"** item count
+**screen page‑turns** — how many taps until the chapter ends — instead of
+publisher/reference page numbers, even when static (publisher) page numbers are
+enabled.
+
+### Why
+
+With reference page numbers turned on, "pages left in chapter" counts *print*
+pages, which doesn't tell you how much reading is actually left on your device:
+a single print page can span several screens (or vice versa) depending on your
+font size and margins. Counting screens is a much better proxy for "how long
+until I can stop", and it matches how other e‑readers — Apple Books, Readest —
+report pages left in chapter when reference page numbers are in use.
+
+### How it works
+
+`ReaderToc:getChapterPagesLeft(pageno, screen_pages)` already returns rendered
+screen pages when `screen_pages` is true; callers wanting reference pages just
+omit the argument. The patch wraps that method to always pass `true`, so it
+affects exactly the callers that omit it — and all of those are
+"pages left in chapter" displays:
+
+| Affected | Where it shows |
+|---|---|
+| `readerfooter.lua` — the `pages_left` item | The footer's "=>" / "⇒" item |
+| `filemanagerbookinfo.lua` — the `%l` pattern | Sleep‑screen message, footer custom text |
+
+Callers that already pass `true` — the **chapter time to read** item and the
+`%h` pattern — are untouched, so time‑to‑read estimates behave exactly as
+before.
+
+### Scope
+
+- Affects **"pages left in chapter"** only.
+- **Chapter progress** (current/total pages *within* the chapter) still uses
+  reference pages. It can be converted the same way via
+  `getChapterPageCount` / `getChapterPagesDone` if you want the two to match.
+- Books without reference page numbers are unaffected — without a page map,
+  `getChapterPagesLeft` already returns screen pages.
+
+---
+
 ## Credits & attribution
 
-Both patches are original work by
+All patches are original work by
 [**albertmichaelj**](https://github.com/albertmichaelj), created for this
 repository:
 
@@ -174,6 +219,8 @@ repository:
   `skimtowidget.lua`.
 - **`2-fix-pagemap-order.lua`** — works around a crengine bug; see
   [crengine#688](https://github.com/koreader/crengine/issues/688).
+- **`2-chapter-pages-left-screens.lua`** — wraps KOReader's
+  `ReaderToc:getChapterPagesLeft`.
 
 ## License
 
